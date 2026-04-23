@@ -37,7 +37,7 @@ namespace server.controller
                 return BadRequest(new { message = "Email already registered" });
 
             var newuser = _mapper.Map<User>(user);
-            newuser.Role = "parent";
+            newuser.Role = "child";
             newuser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Password);
             newuser.CreatedAt = DateTime.UtcNow;
             newuser.UpdatedAt = DateTime.UtcNow;

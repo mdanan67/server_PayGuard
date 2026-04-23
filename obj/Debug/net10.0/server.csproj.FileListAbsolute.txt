@@ -539,3 +539,4 @@ C:\ANAN\PgGuard\server\obj\Debug\net10.0\server.pdb
 C:\ANAN\PgGuard\server\obj\Debug\net10.0\server.genruntimeconfig.cache
 C:\ANAN\PgGuard\server\obj\Debug\net10.0\ref\server.dll
 C:\ANAN\PgGuard\server\bin\Debug\net10.0\BCrypt.Net-Next.dll
+C:\ANAN\PgGuard\server\obj\Debug\net10.0\server.sourcelink.json
