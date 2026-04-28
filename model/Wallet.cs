@@ -11,20 +11,13 @@ namespace server.model
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public Guid UserId { get; set; }
-
-        public decimal Balance { get; set; }
-
-        public decimal TotallSpend { get; set; }
+        public User User { get; set; } = null!;
+        public decimal? Balance { get; set; } = 0m;
+        public decimal? TotalSpend { get; set; } = 0m;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public DateTime UpdaedAt { get; set; } = DateTime.UtcNow;
-
-
-        [ForeignKey(nameof(UserId))]
-        public virtual User User { get; set; } = null!;
-
-        public virtual ICollection<Transaction> SentTransactions { get; set; } = new List<Transaction>();
-        public virtual ICollection<Transaction> ReceivedTransactions { get; set; } = new List<Transaction>();
+        public ICollection<Transaction> SentTransactions { get; set; } = new List<Transaction>();
+        public ICollection<Transaction> ReceivedTransactions { get; set; } = new List<Transaction>();
 
 
     }

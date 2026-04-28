@@ -55,22 +55,25 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-controller/
- ParentController.cs
- UserController.cs
+controller/UserController.cs
 Data/
  AppDBContext.cs
- Configurations/UserConfiguration.cs
+ Configurations/
+  FamilyMemberConfiguration.cs
+  TransactionConfiguration.cs
+  WalletConfiguration.cs
 Dto/
  LoginDto/LoginDto.cs
  LoginResponseDto/LoginResponseDto.cs
  ParentRegistrationDto.cs
 Migrations/
- 20260426221918_InitialCreate.cs
- 20260426221918_InitialCreate.Designer.cs
+ 20260428210534_InitialCreate.cs
+ 20260428210534_InitialCreate.Designer.cs
+ 20260428221049_AddTransactionFields.cs
+ 20260428221049_AddTransactionFields.Designer.cs
  AppDBContextModelSnapshot.cs
 model/
- ParentBalance.cs
+ FamilyMember.cs
  Transaction.cs
  User.cs
  Wallet.cs

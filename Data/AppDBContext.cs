@@ -4,11 +4,6 @@ using System.Data.Common;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using server.model;
-using server.Data;  // ✅ add this
-
-
-
-
 
 namespace server.Data
 {
@@ -17,7 +12,10 @@ namespace server.Data
         public AppDBContext(DbContextOptions<AppDBContext> option) : base(option) { }
 
         public DbSet<User> Users { get; set; }
-        public DbSet<ParentBalance> ParentBalances { get; set; }
+        public DbSet<FamilyMember> FamilyMembers { get; set; }
+        public DbSet<Wallet> Wallets { get; set; }
+        public DbSet<Transaction> Transactions { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDBContext).Assembly);

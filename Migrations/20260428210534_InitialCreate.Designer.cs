@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using server.Data;
@@ -11,9 +12,11 @@ using server.Data;
 namespace server.Migrations
 {
     [DbContext(typeof(AppDBContext))]
-    partial class AppDBContextModelSnapshot : ModelSnapshot
+    [Migration("20260428210534_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -50,56 +53,6 @@ namespace server.Migrations
                         .IsUnique();
 
                     b.ToTable("FamilyMembers");
-                });
-
-            modelBuilder.Entity("server.model.Transaction", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FailureReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<Guid?>("ReceiverWalletId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("SenderWalletId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("StripeChargeId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<string>("StripePaymentIntentId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("ReceiverWalletId");
-
-                    b.HasIndex("SenderWalletId");
-
-                    b.ToTable("Transactions");
                 });
 
             modelBuilder.Entity("server.model.User", b =>
@@ -210,23 +163,6 @@ namespace server.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("server.model.Transaction", b =>
-                {
-                    b.HasOne("server.model.Wallet", "ReceiverWallet")
-                        .WithMany("ReceivedTransactions")
-                        .HasForeignKey("ReceiverWalletId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("server.model.Wallet", "SenderWallet")
-                        .WithMany("SentTransactions")
-                        .HasForeignKey("SenderWalletId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ReceiverWallet");
-
-                    b.Navigation("SenderWallet");
-                });
-
             modelBuilder.Entity("server.model.Wallet", b =>
                 {
                     b.HasOne("server.model.User", "User")
@@ -245,13 +181,6 @@ namespace server.Migrations
                     b.Navigation("ParentLinks");
 
                     b.Navigation("Wallet");
-                });
-
-            modelBuilder.Entity("server.model.Wallet", b =>
-                {
-                    b.Navigation("ReceivedTransactions");
-
-                    b.Navigation("SentTransactions");
                 });
 #pragma warning restore 612, 618
         }
