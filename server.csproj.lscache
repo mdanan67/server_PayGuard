@@ -55,27 +55,32 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-controller/UserController.cs
+controller/
+ ParentController.cs
+ UserController.cs
+Data/
+ AppDBContext.cs
+ Configurations/UserConfiguration.cs
 Dto/
  LoginDto/LoginDto.cs
  LoginResponseDto/LoginResponseDto.cs
  ParentRegistrationDto.cs
 Migrations/
- 20260421154350_InitialCreate.cs
- 20260421154350_InitialCreate.Designer.cs
- 20260421191954_RenameUserToUsers.cs
- 20260421191954_RenameUserToUsers.Designer.cs
+ 20260426221918_InitialCreate.cs
+ 20260426221918_InitialCreate.Designer.cs
  AppDBContextModelSnapshot.cs
 model/
- AppDBContext.cs
- Response.cs
+ ParentBalance.cs
+ Transaction.cs
  User.cs
+ Wallet.cs
 obj/Debug/net10.0/
  .NETCoreApp,Version=v10.0.AssemblyAttributes.cs
  server.AssemblyInfo.cs
  server.GlobalUsings.g.cs
 Profiles/UserProfile.cs
 Program.cs
+repository/IUser.cs
 
 [metadataReferences]
 <DOTNET>/packs/Microsoft.AspNetCore.App.Ref/10.0.6/ref/net10.0/

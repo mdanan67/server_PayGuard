@@ -12,6 +12,8 @@ using server.Dto.LoginDto;
 using Microsoft.VisualBasic;
 using Microsoft.AspNetCore.Identity.Data;
 using server.Dto.LoginResponseDto;
+using server.repository;
+using server.Data;
 
 namespace server.controller
 {
@@ -21,10 +23,13 @@ namespace server.controller
     {
         private AppDBContext _context;
         private IMapper _mapper;
+
+
         public UserController(AppDBContext context, IMapper mapper)
         {
             _context = context;
             _mapper = mapper;
+
 
         }
         [HttpPost]
@@ -37,7 +42,7 @@ namespace server.controller
                 return BadRequest(new { message = "Email already registered" });
 
             var newuser = _mapper.Map<User>(user);
-            newuser.Role = "child";
+            newuser.Role = "parent";
             newuser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.Password);
             newuser.CreatedAt = DateTime.UtcNow;
             newuser.UpdatedAt = DateTime.UtcNow;
@@ -76,7 +81,6 @@ namespace server.controller
             return Ok(response);
         }
 
-
-
     }
+
 }

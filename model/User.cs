@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using server.Data;  // ✅ add this
 
 
 
@@ -27,6 +27,8 @@ namespace server.model
         public DateTime? RefreshTokenExpiryTime { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        public ParentBalance? ParentBalance { get; set; }
 
     }
 
