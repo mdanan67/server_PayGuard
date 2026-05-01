@@ -12,8 +12,9 @@ using server.Dto.LoginDto;
 using Microsoft.VisualBasic;
 using Microsoft.AspNetCore.Identity.Data;
 using server.Dto.LoginResponseDto;
-using server.repository;
+
 using server.Data;
+using server.Services;
 
 namespace server.controller
 {
@@ -23,14 +24,14 @@ namespace server.controller
     {
         private AppDBContext _context;
         private IMapper _mapper;
+        private IJwtTokenService _jwtTokenService;
 
 
-        public UserController(AppDBContext context, IMapper mapper)
+        public UserController(AppDBContext context, IMapper mapper, IJwtTokenService jwtTokenService)
         {
             _context = context;
             _mapper = mapper;
-
-
+            _jwtTokenService = jwtTokenService;
         }
         [HttpPost]
         [Route("registation")]
@@ -71,11 +72,15 @@ namespace server.controller
                 return Unauthorized(new { message = "Invalid email or password" });
             }
 
+            // Generate JWT token
+            var token = _jwtTokenService.GenerateToken(user.Id, user.Email, user.Role);
+
             var response = new LoginResponseDto
             {
                 Id = user.Id,
                 Role = user.Role,
-                FirstName = user.FirstName
+                FirstName = user.FirstName,
+                Token = token
             };
 
             return Ok(response);

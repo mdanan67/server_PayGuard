@@ -540,3 +540,14 @@ C:\ANAN\PgGuard\server\obj\Debug\net10.0\server.genruntimeconfig.cache
 C:\ANAN\PgGuard\server\obj\Debug\net10.0\ref\server.dll
 C:\ANAN\PgGuard\server\bin\Debug\net10.0\BCrypt.Net-Next.dll
 C:\ANAN\PgGuard\server\obj\Debug\net10.0\server.sourcelink.json
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.IdentityModel.Abstractions.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.IdentityModel.Logging.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\Stripe.net.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\System.Configuration.ConfigurationManager.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
+C:\ANAN\PgGuard\server\bin\Debug\net10.0\System.Security.Cryptography.ProtectedData.dll
