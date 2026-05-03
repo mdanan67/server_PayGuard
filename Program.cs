@@ -12,15 +12,22 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
-builder.Services.AddControllers();
-builder.Services.AddAutoMapper(typeof(UserProfile));
-builder.Services.AddDbContext<AppDBContext>(option => option.UseNpgsql(builder.Configuration
-.GetConnectionString("ConnectionStrings")));
 
-// Add JWT Token Service
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
+
+builder.Services.AddAutoMapper(typeof(UserProfile));
+
+builder.Services.AddDbContext<AppDBContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("ConnectionStrings"))
+);
+
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
-// Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSettings["SecretKey"];
 
@@ -30,13 +37,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey ?? throw new InvalidOperationException("JWT SecretKey is not configured"))),
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(
+                    secretKey ?? throw new InvalidOperationException("JWT SecretKey is not configured")
+                )
+            ),
+
             ValidateIssuer = true,
             ValidIssuer = jwtSettings["Issuer"],
+
             ValidateAudience = true,
             ValidAudience = jwtSettings["Audience"],
+
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
+        };
+
+        // Read JWT from HttpOnly cookie
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var token = context.Request.Cookies["jwt"];
+
+                if (!string.IsNullOrEmpty(token))
+                {
+                    context.Token = token;
+                }
+
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -46,16 +76,10 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:3000")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
-
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.ReferenceHandler =
-            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-    });
 
 var app = builder.Build();
 
@@ -66,19 +90,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.MapGet("/", () =>
-{
-    return "hello";
-});
+app.MapGet("/", () => "hello");
 
 app.UseHttpsRedirection();
+
 app.UseCors("AllowFrontend");
 
-// Add authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 
 app.Run();
-

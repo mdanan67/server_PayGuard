@@ -16,5 +16,6 @@ namespace server.model
         public User Child { get; set; } = null!;
 
         public DateTime LinkedAt { get; set; } = DateTime.UtcNow;
+
     }
 }

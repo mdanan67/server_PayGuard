@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
 using server.Dto;
+using server.Dto.child;
 using server.model;
 
 namespace server.Profiles
@@ -21,6 +22,20 @@ namespace server.Profiles
                     .ForMember(dest => dest.Id, opt => opt.Ignore())
                     .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
                     .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
+
+
+            CreateMap<RegistrationChildDto, User>()
+          .ForMember(dest => dest.BirthDate,
+              opt => opt.MapFrom(src =>
+              src.BirthDate.HasValue
+              ? DateTime.SpecifyKind(src.BirthDate.Value, DateTimeKind.Utc)
+              : (DateTime?)null
+               ))
+          .ForMember(dest => dest.Id, opt => opt.Ignore())
+          .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
+          .ForMember(dest => dest.Role, opt => opt.Ignore())
+          .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+          .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
 
 
         }

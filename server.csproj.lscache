@@ -56,6 +56,7 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 
 [sourceFiles]
 controller/
+ ParentController.cs
  PaymentController.cs
  UserController.cs
 Data/
