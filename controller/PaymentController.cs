@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using server.Data;
+using server.model;
+using System.Globalization;
 using System.Security.Claims;
 using Stripe;
 using Stripe.Checkout;
@@ -12,10 +16,12 @@ namespace server.controller
     public class PaymentController : ControllerBase
     {
         private readonly IConfiguration _configuration;
+        private readonly AppDBContext _context;
 
-        public PaymentController(IConfiguration configuration)
+        public PaymentController(IConfiguration configuration, AppDBContext context)
         {
             _configuration = configuration;
+            _context = context;
         }
 
         [HttpPost("create-checkout-session")]
@@ -67,7 +73,7 @@ namespace server.controller
                             PriceData = new SessionLineItemPriceDataOptions
                             {
                                 Currency = "usd",
-                                UnitAmount = (long)(request.Amount * 100),
+                                UnitAmount = (long)decimal.Round(request.Amount * 100, 0),
                                 ProductData = new SessionLineItemPriceDataProductDataOptions
                                 {
                                     Name = "Wallet Top-up"
@@ -82,7 +88,7 @@ namespace server.controller
                     Metadata = new Dictionary<string, string>
                     {
                         { "userId", userId.ToString() },
-                        { "amount", request.Amount.ToString() }
+                        { "amount", request.Amount.ToString(CultureInfo.InvariantCulture) }
                     }
                 };
 
@@ -124,21 +130,81 @@ namespace server.controller
 
                 if (session.PaymentStatus == "paid")
                 {
-                    Guid userId = Guid.Parse(session.Metadata["userId"]);
-                    decimal amount = decimal.Parse(session.Metadata["amount"]);
+                    if (!session.Metadata.TryGetValue("userId", out var userIdValue) ||
+                        !Guid.TryParse(userIdValue, out Guid userId))
+                    {
+                        return BadRequest(new { error = "Valid user ID was not found in the Stripe session" });
+                    }
 
-                    // TODO: Add money to your database here
-                    // Example:
-                    // var user = await _context.Users.FindAsync(userId);
-                    // user.Balance += amount;
-                    // await _context.SaveChangesAsync();
+                    if (!session.Metadata.TryGetValue("amount", out var amountValue) ||
+                        !decimal.TryParse(amountValue, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount) ||
+                        amount <= 0)
+                    {
+                        return BadRequest(new { error = "Valid amount was not found in the Stripe session" });
+                    }
+
+                    var stripePaymentId = session.PaymentIntentId ?? session.Id;
+
+                    using var dbTransaction = await _context.Database.BeginTransactionAsync();
+
+                    var existingTransaction = await _context.Transactions
+                        .Include(t => t.ReceiverWallet)
+                        .FirstOrDefaultAsync(t => t.StripePaymentIntentId == stripePaymentId);
+
+                    if (existingTransaction != null)
+                    {
+                        await dbTransaction.CommitAsync();
+
+                        return Ok(new
+                        {
+                            success = true,
+                            message = "Payment already verified",
+                            userId,
+                            amount = existingTransaction.Amount,
+                            newBalance = existingTransaction.ReceiverWallet?.Balance ?? 0m
+                        });
+                    }
+
+                    var wallet = await _context.Wallets
+                        .FirstOrDefaultAsync(w => w.UserId == userId);
+
+                    if (wallet == null)
+                    {
+                        wallet = new Wallet
+                        {
+                            UserId = userId,
+                            Balance = 0m,
+                            TotalSpend = 0m,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        await _context.Wallets.AddAsync(wallet);
+                    }
+
+                    wallet.Balance = (wallet.Balance ?? 0m) + amount;
+
+                    var topupTransaction = new Transaction
+                    {
+                        ReceiverWalletId = wallet.Id,
+                        Amount = amount,
+                        Type = TransactionType.Topup,
+                        Status = TransactionStatus.Success,
+                        StripePaymentIntentId = stripePaymentId,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _context.Transactions.AddAsync(topupTransaction);
+                    await _context.SaveChangesAsync();
+                    await dbTransaction.CommitAsync();
 
                     return Ok(new
                     {
                         success = true,
                         message = "Payment successful",
                         userId,
-                        amount
+                        amount,
+                        newBalance = wallet.Balance
                     });
                 }
 

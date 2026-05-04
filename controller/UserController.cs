@@ -76,7 +76,8 @@ namespace server.controller
                 HttpOnly = true,
                 Secure = false,
                 SameSite = SameSiteMode.Lax,
-                Expires = DateTime.UtcNow.AddDays(7)
+                Expires = DateTime.UtcNow.AddDays(7),
+                Domain = "localhost"
             });
 
             var response = new LoginResponseDto
