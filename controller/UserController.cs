@@ -91,7 +91,6 @@ namespace server.controller
         }
 
 
-
         [Authorize]
         [HttpPost]
         [Route("childRegistration")]
@@ -114,7 +113,6 @@ namespace server.controller
                 return BadRequest(new { message = "Email already registered" });
             }
 
-
             using var transaction = await _context.Database.BeginTransactionAsync();
 
             try
@@ -127,6 +125,17 @@ namespace server.controller
                 newUser.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
                 await _context.Users.AddAsync(newUser);
+                await _context.SaveChangesAsync();
+
+                var childWallet = new Wallet
+                {
+                    UserId = newUser.Id,
+                    Balance = 0m,
+                    TotalSpend = 0m,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _context.Wallets.AddAsync(childWallet);
                 await _context.SaveChangesAsync();
 
                 var familyMember = new FamilyMember
@@ -144,6 +153,7 @@ namespace server.controller
                 {
                     message = "Child registered successfully",
                     childId = newUser.Id,
+                    walletId = childWallet.Id,
                     LinkedAt = DateTime.UtcNow
                 });
             }
@@ -158,6 +168,7 @@ namespace server.controller
                 });
             }
         }
+
     }
 
 }
