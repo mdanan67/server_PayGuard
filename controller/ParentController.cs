@@ -105,10 +105,18 @@ namespace server.controller
                 throw;
             }
 
-
-
         }
 
+        [Authorize]
+        [HttpPost("sendmoney")]
+        public async Task<ActionResult> SendMoney([FromBody] string walletId)
+        {
+            var userID = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            var ReceiverWallet = walletId;
+
+            return Ok(new { userID, ReceiverWallet });
+        }
 
     }
 }

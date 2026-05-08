@@ -25,6 +25,10 @@ namespace server.model
 
 
         public Wallet? Wallet { get; set; }
+        public SpendingLimit? SpendingLimit { get; set; }
+        public ICollection<Conversation> CreatedConversations { get; set; } = new List<Conversation>();
+        public ICollection<ConversationParticipant> ConversationParticipants { get; set; } = new List<ConversationParticipant>();
+        public ICollection<Message> SentMessages { get; set; } = new List<Message>();
         public ICollection<FamilyMember> ParentLinks { get; set; } = new List<FamilyMember>();
         public ICollection<FamilyMember> ChildLinks { get; set; } = new List<FamilyMember>();
 

@@ -62,7 +62,11 @@ controller/
 Data/
  AppDBContext.cs
  Configurations/
+  ConversationConfiguration.cs
+  ConversationParticipantConfiguration.cs
   FamilyMemberConfiguration.cs
+  MessageConfiguration.cs
+  SetLimitConfiguration.cs
   TransactionConfiguration.cs
   WalletConfiguration.cs
 Dto/AddBalanceDto/
@@ -80,9 +84,15 @@ Migrations/
  20260428210534_InitialCreate.Designer.cs
  20260428221049_AddTransactionFields.cs
  20260428221049_AddTransactionFields.Designer.cs
+ 20260508210520_AddSpendingLimit.cs
+ 20260508210520_AddSpendingLimit.Designer.cs
  AppDBContextModelSnapshot.cs
 model/
+ Conversation.cs
+ ConversationParticipant.cs
  FamilyMember.cs
+ Message.cs
+ SpendingLimit.cs
  Transaction.cs
  User.cs
  Wallet.cs

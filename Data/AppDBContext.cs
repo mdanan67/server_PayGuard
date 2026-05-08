@@ -15,6 +15,7 @@ namespace server.Data
         public DbSet<FamilyMember> FamilyMembers { get; set; }
         public DbSet<Wallet> Wallets { get; set; }
         public DbSet<Transaction> Transactions { get; set; }
+        public DbSet<SpendingLimit> SpendingLimits { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
