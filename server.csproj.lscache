@@ -78,6 +78,8 @@ Dto/
  LoginDto/LoginDto.cs
  LoginResponseDto/LoginResponseDto.cs
  ParentRegistrationDto.cs
+ SendMoneyDto.cs
+ SpendingLimitDto.cs
 Interfaces/Repositories/IChildRepository.cs
 Migrations/
  20260428210534_InitialCreate.cs
