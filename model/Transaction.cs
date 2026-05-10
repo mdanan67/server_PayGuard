@@ -17,9 +17,13 @@ namespace server.model
 
         public decimal Amount { get; set; }
 
+        public string? Category { get; set; }
+
         public TransactionType Type { get; set; }
 
         public TransactionStatus Status { get; set; } = TransactionStatus.Pending;
+
+        public string? StripeCheckoutSessionId { get; set; }
 
         public string? StripePaymentIntentId { get; set; }
 

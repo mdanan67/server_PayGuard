@@ -30,6 +30,11 @@ namespace server.Data.Configurations
             builder.Property(t => t.Amount)
                 .HasColumnType("numeric(18,2)");
 
+            builder.Property(t => t.Category)
+                .HasMaxLength(50);
+
+            builder.Property(t => t.StripeCheckoutSessionId)
+                .HasMaxLength(255);
 
             builder.Property(t => t.StripePaymentIntentId)
                 .HasMaxLength(255);
@@ -43,6 +48,7 @@ namespace server.Data.Configurations
 
             builder.HasIndex(t => t.SenderWalletId);
             builder.HasIndex(t => t.ReceiverWalletId);
+            builder.HasIndex(t => t.StripeCheckoutSessionId);
             builder.HasIndex(t => t.CreatedAt);
         }
     }
