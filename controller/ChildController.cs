@@ -86,6 +86,53 @@ namespace server.controller
         }
 
         [Authorize]
+        [HttpPost("FundRequests")]
+        public async Task<ActionResult> CreateFundRequest([FromBody] CreateFundRequestDto request)
+        {
+            if (request == null || request.Amount <= 0)
+                return BadRequest(new { message = "Amount must be greater than zero" });
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return BadRequest(new { message = "Please write a reason for the request" });
+
+            if (!TryGetCurrentUserId(out var childId, out var authError))
+                return authError!;
+
+            var familyMember = await _context.FamilyMembers
+                .FirstOrDefaultAsync(member => member.ChildId == childId);
+
+            if (familyMember == null)
+                return BadRequest(new { message = "No parent account is linked to this child" });
+
+            var fundRequest = new FundRequest
+            {
+                ChildId = childId,
+                ParentId = familyMember.ParentId,
+                Amount = request.Amount,
+                Reason = request.Reason.Trim(),
+                Status = FundRequestStatus.Pending
+            };
+
+            await _context.FundRequests.AddAsync(fundRequest);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Money request sent to parent",
+                request = new
+                {
+                    fundRequest.Id,
+                    fundRequest.ChildId,
+                    fundRequest.ParentId,
+                    fundRequest.Amount,
+                    fundRequest.Reason,
+                    Status = fundRequest.Status.ToString(),
+                    fundRequest.CreatedAt
+                }
+            });
+        }
+
+        [Authorize]
         [HttpPost("MakePayment")]
         public async Task<ActionResult> MakePayment([FromBody] MakePaymentRequestDto request)
         {

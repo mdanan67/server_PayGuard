@@ -108,6 +108,48 @@ namespace server.Migrations
                     b.ToTable("FamilyMembers");
                 });
 
+            modelBuilder.Entity("server.model.FundRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("ChildId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ParentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChildId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("FundRequests");
+                });
+
             modelBuilder.Entity("server.model.Message", b =>
                 {
                     b.Property<Guid>("Id")
@@ -422,6 +464,25 @@ namespace server.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("server.model.FundRequest", b =>
+                {
+                    b.HasOne("server.model.User", "Child")
+                        .WithMany("ChildFundRequests")
+                        .HasForeignKey("ChildId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("server.model.User", "Parent")
+                        .WithMany("ParentFundRequests")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Child");
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("server.model.Message", b =>
                 {
                     b.HasOne("server.model.Conversation", "Conversation")
@@ -515,11 +576,15 @@ namespace server.Migrations
 
             modelBuilder.Entity("server.model.User", b =>
                 {
+                    b.Navigation("ChildFundRequests");
+
                     b.Navigation("ChildLinks");
 
                     b.Navigation("ConversationParticipants");
 
                     b.Navigation("CreatedConversations");
+
+                    b.Navigation("ParentFundRequests");
 
                     b.Navigation("ParentLinks");
 

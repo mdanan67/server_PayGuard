@@ -1,11 +1,15 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using server.Data;
 
 #nullable disable
 
 namespace server.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDBContext))]
+    [Migration("20260510122531_AddConversationTables")]
     public partial class AddConversationTables : Migration
     {
         /// <inheritdoc />
@@ -93,25 +97,25 @@ namespace server.Migrations
                 column: "CreatedByUserId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ConversationParticipant_UserId",
+                table: "ConversationParticipant",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ConversationParticipant_ConversationId_UserId",
                 table: "ConversationParticipant",
                 columns: new[] { "ConversationId", "UserId" },
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ConversationParticipant_UserId",
-                table: "ConversationParticipant",
-                column: "UserId");
+                name: "IX_Message_SenderUserId",
+                table: "Message",
+                column: "SenderUserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Message_ConversationId_SentAt",
                 table: "Message",
                 columns: new[] { "ConversationId", "SentAt" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Message_SenderUserId",
-                table: "Message",
-                column: "SenderUserId");
         }
 
         /// <inheritdoc />

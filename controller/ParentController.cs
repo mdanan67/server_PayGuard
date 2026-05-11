@@ -215,6 +215,146 @@ namespace server.controller
 
 
         [Authorize]
+        [HttpGet("FundRequests")]
+        public async Task<ActionResult> GetFundRequests()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(userId, out Guid parentGuid))
+                return Unauthorized("invalid token");
+
+            var requests = await _context.FundRequests
+                .Where(request => request.ParentId == parentGuid)
+                .Include(request => request.Child)
+                .OrderBy(request => request.Status == FundRequestStatus.Pending ? 0 : 1)
+                .ThenByDescending(request => request.CreatedAt)
+                .Select(request => new
+                {
+                    request.Id,
+                    request.ChildId,
+                    ChildName = request.Child.FirstName + " " + request.Child.LastName,
+                    ChildEmail = request.Child.Email,
+                    request.Amount,
+                    request.Reason,
+                    Status = request.Status.ToString(),
+                    request.CreatedAt,
+                    request.UpdatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { requests });
+        }
+
+        [Authorize]
+        [HttpPost("FundRequests/{requestId}/cancel")]
+        public async Task<ActionResult> CancelFundRequest(Guid requestId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(userId, out Guid parentGuid))
+                return Unauthorized("invalid token");
+
+            var fundRequest = await _context.FundRequests
+                .FirstOrDefaultAsync(request => request.Id == requestId && request.ParentId == parentGuid);
+
+            if (fundRequest == null)
+                return NotFound(new { message = "Fund request not found" });
+
+            if (fundRequest.Status != FundRequestStatus.Pending)
+                return BadRequest(new { message = "Only pending requests can be canceled" });
+
+            fundRequest.Status = FundRequestStatus.Canceled;
+            fundRequest.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Fund request canceled",
+                requestId = fundRequest.Id,
+                Status = fundRequest.Status.ToString()
+            });
+        }
+
+        [Authorize]
+        [HttpPost("FundRequests/{requestId}/approve")]
+        public async Task<ActionResult> ApproveFundRequest(Guid requestId)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(userId, out Guid parentGuid))
+                return Unauthorized("invalid token");
+
+            var fundRequest = await _context.FundRequests
+                .FirstOrDefaultAsync(request => request.Id == requestId && request.ParentId == parentGuid);
+
+            if (fundRequest == null)
+                return NotFound(new { message = "Fund request not found" });
+
+            if (fundRequest.Status != FundRequestStatus.Pending)
+                return BadRequest(new { message = "Only pending requests can be approved" });
+
+            var isParentOfChild = await _context.FamilyMembers.AnyAsync(familyMember =>
+                familyMember.ParentId == parentGuid &&
+                familyMember.ChildId == fundRequest.ChildId);
+
+            if (!isParentOfChild)
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = "This child does not belong to this parent" });
+
+            var parentWallet = await _context.Wallets
+                .FirstOrDefaultAsync(wallet => wallet.UserId == parentGuid);
+
+            if (parentWallet == null)
+                return BadRequest(new { message = "Parent wallet not found" });
+
+            var childWallet = await _context.Wallets
+                .FirstOrDefaultAsync(wallet => wallet.UserId == fundRequest.ChildId);
+
+            if (childWallet == null)
+                return BadRequest(new { message = "Child wallet not found" });
+
+            var parentBalance = parentWallet.Balance ?? 0m;
+
+            if (parentBalance < fundRequest.Amount)
+                return BadRequest(new { message = "Insufficient parent wallet balance" });
+
+            await using var dbTransaction = await _context.Database.BeginTransactionAsync();
+
+            var now = DateTime.UtcNow;
+
+            parentWallet.Balance = parentBalance - fundRequest.Amount;
+            parentWallet.TotalSpend = (parentWallet.TotalSpend ?? 0m) + fundRequest.Amount;
+            childWallet.Balance = (childWallet.Balance ?? 0m) + fundRequest.Amount;
+
+            fundRequest.Status = FundRequestStatus.Approved;
+            fundRequest.UpdatedAt = now;
+
+            var transaction = new server.model.Transaction
+            {
+                SenderWalletId = parentWallet.Id,
+                ReceiverWalletId = childWallet.Id,
+                Amount = fundRequest.Amount,
+                Type = TransactionType.Transfer,
+                Status = TransactionStatus.Success,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            await _context.Transactions.AddAsync(transaction);
+            await _context.SaveChangesAsync();
+            await dbTransaction.CommitAsync();
+
+            return Ok(new
+            {
+                message = "Fund request approved",
+                requestId = fundRequest.Id,
+                transactionId = transaction.Id,
+                parentBalance = parentWallet.Balance,
+                childBalance = childWallet.Balance
+            });
+        }
+
+        [Authorize]
         [HttpGet("GetSpendingLimit/{childId}")]
         public async Task<ActionResult> GetSpendingLimit(Guid childId)
         {

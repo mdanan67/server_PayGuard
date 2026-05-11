@@ -66,6 +66,7 @@ Data/
   ConversationConfiguration.cs
   ConversationParticipantConfiguration.cs
   FamilyMemberConfiguration.cs
+  FundRequestConfiguration.cs
   MessageConfiguration.cs
   MonthlyExpenseConfiguration.cs
   SetLimitConfiguration.cs
@@ -77,6 +78,7 @@ Dto/AddBalanceDto/
  PaymentIntentResponseDto.cs
 Dto/
  child/RegistrationChildDto.cs
+ FundRequestDto.cs
  LoginDto/LoginDto.cs
  LoginResponseDto/LoginResponseDto.cs
  MakePaymentRequestDto.cs
@@ -92,13 +94,15 @@ Migrations/
  20260508210520_AddSpendingLimit.cs
  20260508210520_AddSpendingLimit.Designer.cs
  20260510122531_AddConversationTables.cs
- 20260510122531_AddConversationTables.Designer.cs
  20260510183000_AddMonthlyExpensesAndChildPaymentFields.cs
+ 20260511100334_AddFundRequests.cs
+ 20260511100334_AddFundRequests.Designer.cs
  AppDBContextModelSnapshot.cs
 model/
  Conversation.cs
  ConversationParticipant.cs
  FamilyMember.cs
+ FundRequest.cs
  Message.cs
  MonthlyExpense.cs
  SpendingLimit.cs

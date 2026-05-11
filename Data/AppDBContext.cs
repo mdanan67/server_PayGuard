@@ -17,6 +17,7 @@ namespace server.Data
         public DbSet<Transaction> Transactions { get; set; }
         public DbSet<SpendingLimit> SpendingLimits { get; set; }
         public DbSet<MonthlyExpense> MonthlyExpenses { get; set; }
+        public DbSet<FundRequest> FundRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

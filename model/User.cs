@@ -31,6 +31,8 @@ namespace server.model
         public ICollection<Message> SentMessages { get; set; } = new List<Message>();
         public ICollection<FamilyMember> ParentLinks { get; set; } = new List<FamilyMember>();
         public ICollection<FamilyMember> ChildLinks { get; set; } = new List<FamilyMember>();
+        public ICollection<FundRequest> ChildFundRequests { get; set; } = new List<FundRequest>();
+        public ICollection<FundRequest> ParentFundRequests { get; set; } = new List<FundRequest>();
 
     }
 
