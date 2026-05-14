@@ -57,6 +57,7 @@ TemporaryDependencyNodeTargetIdentifier=net10.0
 [sourceFiles]
 controller/
  ChildController.cs
+ MessaginController.cs
  ParentController.cs
  PaymentController.cs
  UserController.cs
@@ -85,6 +86,7 @@ Dto/
  ParentRegistrationDto.cs
  SendMoneyDto.cs
  SpendingLimitDto.cs
+Hubs/MessagingHub.cs
 Interfaces/Repositories/IChildRepository.cs
 Migrations/
  20260428210534_InitialCreate.cs

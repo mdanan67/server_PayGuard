@@ -6,6 +6,7 @@ using server.model;
 using server.Profiles;
 using server.Data;
 using server.Services;
+using server.Hubs;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +28,7 @@ builder.Services.AddDbContext<AppDBContext>(options =>
 );
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddSignalR();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSettings["SecretKey"];
@@ -100,5 +102,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<MessagingHub>("/hubs/messaging");
 
 app.Run();
