@@ -38,8 +38,13 @@ namespace server.controller
         [HttpGet("GetWalletStatus")]
         public async Task<ActionResult> GetWalletStatus()
         {
-            if (!TryGetCurrentUserId(out var userId, out var authError))
-                return authError!;
+            // if (!TryGetCurrentUserId(out var userId, out var authError))
+            //     return authError!;
+
+
+
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid.TryParse(claim, out var userId);
 
             var wallet = await _context.Wallets
                 .FirstOrDefaultAsync(w => w.UserId == userId);
@@ -82,6 +87,167 @@ namespace server.controller
                 month = now.Month,
                 year = now.Year,
                 monthlyExpenseByCategory
+            });
+        }
+
+        [Authorize]
+        [HttpGet("GetCategoryBudget")]
+        public async Task<ActionResult> GetCategoryBudget()
+        {
+            if (!TryGetCurrentUserId(out var userId, out var authError))
+                return authError!;
+
+            var wallet = await _context.Wallets
+                .FirstOrDefaultAsync(w => w.UserId == userId);
+
+            var walletBalance = wallet?.Balance ?? 0m;
+            var now = DateTime.UtcNow;
+
+            var monthlyExpenseByCategory = await _context.MonthlyExpenses
+                .Where(expense =>
+                    expense.UserId == userId &&
+                    expense.Month == now.Month &&
+                    expense.Year == now.Year)
+                .GroupBy(expense => expense.Category)
+                .Select(group => new
+                {
+                    Category = group.Key,
+                    Amount = group.Sum(expense => expense.Amount)
+                })
+                .ToListAsync();
+
+            var spentByCategory = monthlyExpenseByCategory
+                .ToDictionary(expense => expense.Category, expense => expense.Amount);
+
+            var spendingLimit = await _context.SpendingLimits
+                .FirstOrDefaultAsync(limit => limit.UserId == userId);
+
+            if (spendingLimit == null)
+            {
+                return Ok(new
+                {
+                    walletBalance,
+                    month = now.Month,
+                    year = now.Year,
+                    categories = Array.Empty<object>()
+                });
+            }
+
+            var categories = new[]
+            {
+                "Food",
+                "Education",
+                "Transport",
+                "Entertainment",
+                "Shopping",
+                "Subscriptions",
+                "Mobile",
+                "Others"
+            };
+
+            var categoryBudgets = categories.Select(category =>
+            {
+                var limit = GetCategoryLimit(spendingLimit, category) ?? 0m;
+                var spent = spentByCategory.GetValueOrDefault(category, 0m);
+                var remainingLimit = Math.Max(0m, limit - spent);
+                var available = Math.Min(remainingLimit, walletBalance);
+                var percentUsed = limit > 0m ? Math.Min(100m, decimal.Round(spent / limit * 100m, 2)) : 0m;
+
+                return new
+                {
+                    category,
+                    limit,
+                    spent,
+                    remainingLimit,
+                    available,
+                    percentUsed
+                };
+            });
+
+            return Ok(new
+            {
+                walletBalance,
+                month = now.Month,
+                year = now.Year,
+                categories = categoryBudgets
+            });
+        }
+
+        [Authorize]
+        [HttpGet("transactions")]
+        public async Task<ActionResult> GetTransactions()
+        {
+            if (!TryGetCurrentUserId(out var userId, out var authError))
+                return authError!;
+
+            var wallet = await _context.Wallets
+                .FirstOrDefaultAsync(w => w.UserId == userId);
+
+            if (wallet == null)
+            {
+                return Ok(new
+                {
+                    transactions = Array.Empty<object>(),
+                    summary = new
+                    {
+                        totalReceived = 0m,
+                        totalSpent = 0m,
+                        transactionCount = 0
+                    }
+                });
+            }
+
+            var transactions = await _context.Transactions
+                .Where(transaction =>
+                    transaction.SenderWalletId == wallet.Id ||
+                    transaction.ReceiverWalletId == wallet.Id)
+                .OrderByDescending(transaction => transaction.CreatedAt)
+                .Select(transaction => new
+                {
+                    transaction.Id,
+                    transaction.SenderWalletId,
+                    SenderName = transaction.SenderWallet == null || transaction.SenderWallet.User == null
+                        ? null
+                        : transaction.SenderWallet.User.FirstName + " " + transaction.SenderWallet.User.LastName,
+                    transaction.ReceiverWalletId,
+                    ReceiverName = transaction.ReceiverWallet == null || transaction.ReceiverWallet.User == null
+                        ? null
+                        : transaction.ReceiverWallet.User.FirstName + " " + transaction.ReceiverWallet.User.LastName,
+                    transaction.Amount,
+                    transaction.Category,
+                    Type = transaction.Type.ToString(),
+                    Status = transaction.Status.ToString(),
+                    Direction = transaction.ReceiverWalletId == wallet.Id ? "Received" : "Spent",
+                    transaction.StripeCheckoutSessionId,
+                    transaction.StripePaymentIntentId,
+                    transaction.StripeChargeId,
+                    transaction.FailureReason,
+                    transaction.CreatedAt,
+                    transaction.UpdatedAt
+                })
+                .ToListAsync();
+
+            var successfulTransactions = transactions
+                .Where(transaction => transaction.Status == TransactionStatus.Success.ToString())
+                .ToList();
+
+            var totalReceived = successfulTransactions
+                .Where(transaction => transaction.Direction == "Received")
+                .Sum(transaction => transaction.Amount);
+
+            var totalSpent = successfulTransactions
+                .Where(transaction => transaction.Direction == "Spent")
+                .Sum(transaction => transaction.Amount);
+
+            return Ok(new
+            {
+                transactions,
+                summary = new
+                {
+                    totalReceived,
+                    totalSpent,
+                    transactionCount = transactions.Count
+                }
             });
         }
 
@@ -145,8 +311,6 @@ namespace server.controller
                     return authError!;
 
                 var category = NormalizeCategory(request.Category);
-                if (string.IsNullOrEmpty(category))
-                    return BadRequest(new { error = "Category is required" });
 
                 var spendingLimit = await _context.SpendingLimits
                     .FirstOrDefaultAsync(limit => limit.UserId == userId);
@@ -155,14 +319,10 @@ namespace server.controller
                     return BadRequest(new { error = "No monthly spending limit was found for this child" });
 
                 var categoryLimit = GetCategoryLimit(spendingLimit, category);
-                if (categoryLimit == null)
-                    return BadRequest(new { error = "Invalid category" });
+
 
                 var wallet = await _context.Wallets
                     .FirstOrDefaultAsync(w => w.UserId == userId);
-
-                if (wallet == null)
-                    return BadRequest(new { error = "Child wallet was not found" });
 
                 var walletBalance = wallet.Balance ?? 0m;
                 if (walletBalance < request.Amount)

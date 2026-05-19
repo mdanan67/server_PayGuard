@@ -110,6 +110,60 @@ namespace server.controller
             return Ok(new { transactions });
         }
 
+        [Authorize]
+        [HttpGet("children-payment-transactions")]
+        public async Task<ActionResult> GetChildrenPaymentTransactions()
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (!Guid.TryParse(userId, out Guid parentGuid))
+                return Unauthorized("invalid token");
+
+            var childIds = await _context.FamilyMembers
+                .Where(familyMember => familyMember.ParentId == parentGuid)
+                .Select(familyMember => familyMember.ChildId)
+                .ToListAsync();
+
+            if (childIds.Count == 0)
+                return Ok(new { transactions = Array.Empty<object>() });
+
+            var transactions = await _context.Transactions
+                .Where(transaction =>
+                    transaction.Type == TransactionType.Payment &&
+                    transaction.SenderWalletId.HasValue &&
+                    _context.Wallets.Any(wallet =>
+                        wallet.Id == transaction.SenderWalletId.Value &&
+                        childIds.Contains(wallet.UserId)))
+                .Include(transaction => transaction.SenderWallet)
+                    .ThenInclude(wallet => wallet.User)
+                .OrderByDescending(transaction => transaction.CreatedAt)
+                .Select(transaction => new
+                {
+                    transaction.Id,
+                    ChildId = transaction.SenderWallet == null ? Guid.Empty : transaction.SenderWallet.UserId,
+                    ChildName = transaction.SenderWallet == null || transaction.SenderWallet.User == null
+                        ? null
+                        : transaction.SenderWallet.User.FirstName + " " + transaction.SenderWallet.User.LastName,
+                    ChildEmail = transaction.SenderWallet == null || transaction.SenderWallet.User == null
+                        ? null
+                        : transaction.SenderWallet.User.Email,
+                    ChildWalletId = transaction.SenderWalletId,
+                    transaction.Amount,
+                    transaction.Category,
+                    Type = transaction.Type.ToString(),
+                    Status = transaction.Status.ToString(),
+                    transaction.StripeCheckoutSessionId,
+                    transaction.StripePaymentIntentId,
+                    transaction.StripeChargeId,
+                    transaction.FailureReason,
+                    transaction.CreatedAt,
+                    transaction.UpdatedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { transactions });
+        }
+
 
         [Authorize]
         [HttpGet("GetWalletStaus")]

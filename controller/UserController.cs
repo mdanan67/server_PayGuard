@@ -84,10 +84,116 @@ namespace server.controller
             {
                 Id = user.Id,
                 Role = user.Role,
-                FirstName = user.FirstName
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Phone = user.Phone,
+                ProfileImage = user.Profile_image
             };
 
             return Ok(response);
+        }
+
+        [HttpPost]
+        [Route("logout")]
+        public ActionResult Logout()
+        {
+            Response.Cookies.Delete("jwt", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = false,
+                SameSite = SameSiteMode.Lax,
+                Domain = "localhost"
+            });
+
+            return Ok(new { message = "Logged out successfully" });
+        }
+
+        [Authorize]
+        [HttpGet]
+        [Route("profile")]
+        public async Task<ActionResult> GetProfile()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid token" });
+            }
+
+            var user = await _context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            return Ok(new
+            {
+                user.Id,
+                user.FirstName,
+                user.LastName,
+                user.Email,
+                user.Phone,
+                ProfileImage = user.Profile_image,
+                user.Role,
+                user.Gender,
+                user.BirthDate
+            });
+        }
+
+        [Authorize]
+        [HttpPost]
+        [Route("EditProfile")]
+        public async Task<ActionResult> EditProfile([FromBody] EditProfileDto request)
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid token" });
+            }
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            var emailAlreadyUsed = await _context.Users.AnyAsync(u =>
+                u.Email == request.Email && u.Id != userId);
+
+            if (emailAlreadyUsed)
+            {
+                return BadRequest(new { message = "Email already registered" });
+            }
+
+            user.FirstName = request.FirstName.Trim();
+            user.LastName = request.LastName.Trim();
+            user.Email = request.Email.Trim();
+            user.Phone = request.Phone?.Trim() ?? string.Empty;
+            user.Profile_image = request.ProfileImage ?? string.Empty;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Profile updated successfully",
+                user = new
+                {
+                    user.Id,
+                    user.FirstName,
+                    user.LastName,
+                    user.Email,
+                    user.Phone,
+                    ProfileImage = user.Profile_image,
+                    user.Role
+                }
+            });
         }
 
 
