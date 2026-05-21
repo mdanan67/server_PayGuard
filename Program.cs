@@ -28,6 +28,8 @@ builder.Services.AddDbContext<AppDBContext>(options =>
 );
 
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddSignalR();
 
 var jwtSettings = builder.Configuration.GetSection("Jwt");
