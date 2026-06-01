@@ -1,9 +1,8 @@
-using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using server.Data;
-using server.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Security.Claims;
 using server.Dto;
 using server.model;
@@ -15,17 +14,10 @@ namespace server.controller
     public class ParentController : ControllerBase
     {
         private readonly AppDBContext _context;
-        private readonly IMapper _mapper;
-        private readonly IJwtTokenService _jwtTokenService;
 
-        public ParentController(
-            AppDBContext context,
-            IMapper mapper,
-            IJwtTokenService jwtTokenService)
+        public ParentController(AppDBContext context)
         {
             _context = context;
-            _mapper = mapper;
-            _jwtTokenService = jwtTokenService;
         }
 
 
@@ -35,45 +27,32 @@ namespace server.controller
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            try
-            {
-                if (!Guid.TryParse(userId, out Guid userGuid))
-                    return Unauthorized("invalid token ");
+            if (!Guid.TryParse(userId, out Guid userGuid))
+                return Unauthorized("invalid token ");
 
-                var allchildinquary = await _context.FamilyMembers
-                    .Where(e => e.ParentId == userGuid)
-                    .Include(e => e.Child)
-                    .ThenInclude(c => c.Wallet)
-                    .Select(e => new
+            var allchildinquary = await _context.FamilyMembers
+                .Where(e => e.ParentId == userGuid)
+                .Select(e => new
+                {
+                    Id = e.Child.Id,
+                    Name = e.Child.FirstName + " " + e.Child.LastName,
+                    Email = e.Child.Email,
+                    BirthDate = e.Child.BirthDate,
+                    Gender = e.Child.Gender,
+                    Wallet = e.Child.Wallet == null ? null : new
                     {
-                        Id = e.Child.Id,
-                        Name = e.Child.FirstName + " " + e.Child.LastName,
-                        Email = e.Child.Email,
-                        BirthDate = e.Child.BirthDate,
-                        Gender = e.Child.Gender,
+                        e.Child.Wallet.Balance,
+                        e.Child.Wallet.TotalSpend
+                    }
+                })
+                .ToListAsync();
 
-                        Wallet = e.Child.Wallet == null ? null : new
-                        {
-                            Id = e.Child.Wallet.Id,
-                            UserId = e.Child.Wallet.UserId,
-                            Balance = e.Child.Wallet.Balance,
-                            TotalSpend = e.Child.Wallet.TotalSpend,
-                            CreatedAt = e.Child.Wallet.CreatedAt
-                        }
-                    })
-                    .ToListAsync();
-
-                return Ok(new { allchildinquary });
-            }
-            catch (System.Exception)
-            {
-                throw;
-            }
+            return Ok(new { allchildinquary });
         }
 
         [Authorize]
         [HttpGet("transaction")]
-        public async Task<ActionResult> Transactions()
+        public async Task<ActionResult> Transactions([FromQuery] string? from, [FromQuery] string? to)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -86,10 +65,32 @@ namespace server.controller
             if (parentWallet == null)
                 return BadRequest(new { message = "Parent wallet not found" });
 
-            var transactions = await _context.Transactions
+            if (!TryParseDateFilter(from, out var fromDate))
+                return BadRequest(new { message = "Invalid from date" });
+
+            if (!TryParseDateFilter(to, out var toDate))
+                return BadRequest(new { message = "Invalid to date" });
+
+            if (fromDate.HasValue && toDate.HasValue && fromDate.Value > toDate.Value)
+                return BadRequest(new { message = "From date cannot be after To date" });
+
+            var query = _context.Transactions
                 .Where(transaction =>
                     transaction.SenderWalletId == parentWallet.Id ||
-                    transaction.ReceiverWalletId == parentWallet.Id)
+                    transaction.ReceiverWalletId == parentWallet.Id);
+
+            if (fromDate.HasValue)
+            {
+                query = query.Where(transaction => transaction.CreatedAt >= fromDate.Value);
+            }
+
+            if (toDate.HasValue)
+            {
+                var endDate = toDate.Value.AddDays(1).AddTicks(-1);
+                query = query.Where(transaction => transaction.CreatedAt <= endDate);
+            }
+
+            var transactions = await query
                 .OrderByDescending(transaction => transaction.CreatedAt)
                 .Select(transaction => new
                 {
@@ -108,6 +109,27 @@ namespace server.controller
                 .ToListAsync();
 
             return Ok(new { transactions });
+        }
+
+        private static bool TryParseDateFilter(string? value, out DateTime? date)
+        {
+            date = null;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return true;
+
+            if (!DateTime.TryParseExact(
+                    value,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsedDate))
+            {
+                return false;
+            }
+
+            date = DateTime.SpecifyKind(parsedDate.Date, DateTimeKind.Utc);
+            return true;
         }
 
         [Authorize]
@@ -134,30 +156,17 @@ namespace server.controller
                     _context.Wallets.Any(wallet =>
                         wallet.Id == transaction.SenderWalletId.Value &&
                         childIds.Contains(wallet.UserId)))
-                .Include(transaction => transaction.SenderWallet)
-                    .ThenInclude(wallet => wallet.User)
                 .OrderByDescending(transaction => transaction.CreatedAt)
                 .Select(transaction => new
                 {
                     transaction.Id,
-                    ChildId = transaction.SenderWallet == null ? Guid.Empty : transaction.SenderWallet.UserId,
                     ChildName = transaction.SenderWallet == null || transaction.SenderWallet.User == null
                         ? null
                         : transaction.SenderWallet.User.FirstName + " " + transaction.SenderWallet.User.LastName,
-                    ChildEmail = transaction.SenderWallet == null || transaction.SenderWallet.User == null
-                        ? null
-                        : transaction.SenderWallet.User.Email,
-                    ChildWalletId = transaction.SenderWalletId,
                     transaction.Amount,
                     transaction.Category,
-                    Type = transaction.Type.ToString(),
                     Status = transaction.Status.ToString(),
-                    transaction.StripeCheckoutSessionId,
-                    transaction.StripePaymentIntentId,
-                    transaction.StripeChargeId,
-                    transaction.FailureReason,
-                    transaction.CreatedAt,
-                    transaction.UpdatedAt
+                    transaction.CreatedAt
                 })
                 .ToListAsync();
 
@@ -171,20 +180,19 @@ namespace server.controller
         {
             var UserID = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            try
-            {
-                if (!Guid.TryParse(UserID, out Guid userGuid))
-                    return Unauthorized("invalid token ");
+            if (!Guid.TryParse(UserID, out Guid userGuid))
+                return Unauthorized("invalid token ");
 
-                var wallet = await _context.Wallets.FirstOrDefaultAsync(id => id.UserId == userGuid);
-                return Ok(wallet);
-            }
-            catch (System.Exception)
-            {
+            var wallet = await _context.Wallets
+                .Where(wallet => wallet.UserId == userGuid)
+                .Select(wallet => new
+                {
+                    wallet.Balance,
+                    wallet.TotalSpend
+                })
+                .FirstOrDefaultAsync();
 
-                throw;
-            }
-
+            return Ok(wallet);
         }
 
         [Authorize]
@@ -248,22 +256,7 @@ namespace server.controller
 
             return Ok(new
             {
-                message = "Money sent successfully",
-                transactionId = transaction.Id,
-                parentWallet = new
-                {
-                    parentWallet.Id,
-                    parentWallet.UserId,
-                    parentWallet.Balance,
-                    parentWallet.TotalSpend
-                },
-                childWallet = new
-                {
-                    childWallet.Id,
-                    childWallet.UserId,
-                    childWallet.Balance,
-                    childWallet.TotalSpend
-                }
+                message = "Money sent successfully"
             });
         }
 
@@ -285,14 +278,12 @@ namespace server.controller
                 .Select(request => new
                 {
                     request.Id,
-                    request.ChildId,
                     ChildName = request.Child.FirstName + " " + request.Child.LastName,
                     ChildEmail = request.Child.Email,
                     request.Amount,
                     request.Reason,
                     Status = request.Status.ToString(),
-                    request.CreatedAt,
-                    request.UpdatedAt
+                    request.CreatedAt
                 })
                 .ToListAsync();
 
@@ -324,9 +315,7 @@ namespace server.controller
 
             return Ok(new
             {
-                message = "Fund request canceled",
-                requestId = fundRequest.Id,
-                Status = fundRequest.Status.ToString()
+                message = "Fund request canceled"
             });
         }
 
@@ -400,11 +389,7 @@ namespace server.controller
 
             return Ok(new
             {
-                message = "Fund request approved",
-                requestId = fundRequest.Id,
-                transactionId = transaction.Id,
-                parentBalance = parentWallet.Balance,
-                childBalance = childWallet.Balance
+                message = "Fund request approved"
             });
         }
 

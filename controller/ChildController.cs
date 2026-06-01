@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using AutoMapper;
@@ -12,7 +13,6 @@ using server.model;
 using server.Services;
 using Stripe;
 using Stripe.Checkout;
-using System.Globalization;
 using System.Security.Claims;
 
 namespace server.controller
@@ -175,7 +175,7 @@ namespace server.controller
 
         [Authorize]
         [HttpGet("transactions")]
-        public async Task<ActionResult> GetTransactions()
+        public async Task<ActionResult> GetTransactions([FromQuery] string? from, [FromQuery] string? to)
         {
             if (!TryGetCurrentUserId(out var userId, out var authError))
                 return authError!;
@@ -187,20 +187,36 @@ namespace server.controller
             {
                 return Ok(new
                 {
-                    transactions = Array.Empty<object>(),
-                    summary = new
-                    {
-                        totalReceived = 0m,
-                        totalSpent = 0m,
-                        transactionCount = 0
-                    }
+                    transactions = Array.Empty<object>()
                 });
             }
 
-            var transactions = await _context.Transactions
+            if (!TryParseDateFilter(from, out var fromDate))
+                return BadRequest(new { message = "Invalid from date" });
+
+            if (!TryParseDateFilter(to, out var toDate))
+                return BadRequest(new { message = "Invalid to date" });
+
+            if (fromDate.HasValue && toDate.HasValue && fromDate.Value > toDate.Value)
+                return BadRequest(new { message = "From date cannot be after To date" });
+
+            var query = _context.Transactions
                 .Where(transaction =>
                     transaction.SenderWalletId == wallet.Id ||
-                    transaction.ReceiverWalletId == wallet.Id)
+                    transaction.ReceiverWalletId == wallet.Id);
+
+            if (fromDate.HasValue)
+            {
+                query = query.Where(transaction => transaction.CreatedAt >= fromDate.Value);
+            }
+
+            if (toDate.HasValue)
+            {
+                var endDate = toDate.Value.AddDays(1).AddTicks(-1);
+                query = query.Where(transaction => transaction.CreatedAt <= endDate);
+            }
+
+            var transactions = await query
                 .OrderByDescending(transaction => transaction.CreatedAt)
                 .Select(transaction => new
                 {
@@ -218,37 +234,35 @@ namespace server.controller
                     Type = transaction.Type.ToString(),
                     Status = transaction.Status.ToString(),
                     Direction = transaction.ReceiverWalletId == wallet.Id ? "Received" : "Spent",
-                    transaction.StripeCheckoutSessionId,
-                    transaction.StripePaymentIntentId,
-                    transaction.StripeChargeId,
-                    transaction.FailureReason,
-                    transaction.CreatedAt,
-                    transaction.UpdatedAt
+                    transaction.CreatedAt
                 })
                 .ToListAsync();
 
-            var successfulTransactions = transactions
-                .Where(transaction => transaction.Status == TransactionStatus.Success.ToString())
-                .ToList();
-
-            var totalReceived = successfulTransactions
-                .Where(transaction => transaction.Direction == "Received")
-                .Sum(transaction => transaction.Amount);
-
-            var totalSpent = successfulTransactions
-                .Where(transaction => transaction.Direction == "Spent")
-                .Sum(transaction => transaction.Amount);
-
             return Ok(new
             {
-                transactions,
-                summary = new
-                {
-                    totalReceived,
-                    totalSpent,
-                    transactionCount = transactions.Count
-                }
+                transactions
             });
+        }
+
+        private static bool TryParseDateFilter(string? value, out DateTime? date)
+        {
+            date = null;
+
+            if (string.IsNullOrWhiteSpace(value))
+                return true;
+
+            if (!DateTime.TryParseExact(
+                    value,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsedDate))
+            {
+                return false;
+            }
+
+            date = DateTime.SpecifyKind(parsedDate.Date, DateTimeKind.Utc);
+            return true;
         }
 
         [Authorize]
@@ -311,6 +325,8 @@ namespace server.controller
                     return authError!;
 
                 var category = NormalizeCategory(request.Category);
+                if (string.IsNullOrEmpty(category))
+                    return BadRequest(new { error = "Invalid payment category" });
 
                 var spendingLimit = await _context.SpendingLimits
                     .FirstOrDefaultAsync(limit => limit.UserId == userId);
@@ -319,10 +335,15 @@ namespace server.controller
                     return BadRequest(new { error = "No monthly spending limit was found for this child" });
 
                 var categoryLimit = GetCategoryLimit(spendingLimit, category);
+                if (categoryLimit == null)
+                    return BadRequest(new { error = "Monthly spending limit was not found for this category" });
 
 
                 var wallet = await _context.Wallets
                     .FirstOrDefaultAsync(w => w.UserId == userId);
+
+                if (wallet == null)
+                    return BadRequest(new { error = "Child wallet was not found" });
 
                 var walletBalance = wallet.Balance ?? 0m;
                 if (walletBalance < request.Amount)
@@ -375,15 +396,7 @@ namespace server.controller
                         }
                     },
                     SuccessUrl = "http://localhost:3000/payment-success?type=child-payment&session_id={CHECKOUT_SESSION_ID}",
-                    CancelUrl = "http://localhost:3000/dashboard",
-                    Metadata = new Dictionary<string, string>
-                    {
-                        { "paymentType", "child_wallet_payment" },
-                        { "userId", userId.ToString() },
-                        { "walletId", wallet.Id.ToString() },
-                        { "category", category },
-                        { "amount", request.Amount.ToString(CultureInfo.InvariantCulture) }
-                    }
+                    CancelUrl = "http://localhost:3000/dashboard"
                 };
 
                 var sessionService = new SessionService();
@@ -406,11 +419,7 @@ namespace server.controller
 
                 return Ok(new
                 {
-                    url = session.Url,
-                    sessionId = session.Id,
-                    transactionId = pendingTransaction.Id,
-                    remainingLimit = categoryLimit.Value - currentMonthExpense - request.Amount,
-                    balanceAfterPayment = walletBalance - request.Amount
+                    url = session.Url
                 });
             }
             catch (Exception ex)
@@ -438,9 +447,7 @@ namespace server.controller
             var session = await sessionService.GetAsync(sessionId);
 
             if (session.PaymentStatus != "paid")
-                return BadRequest(new { success = false, message = "Payment not completed" });
-
-            await using var dbTransaction = await _context.Database.BeginTransactionAsync();
+                return BadRequest(new { message = "Payment not completed" });
 
             var transaction = await _context.Transactions
                 .Include(t => t.SenderWallet)
@@ -453,13 +460,11 @@ namespace server.controller
             {
                 return Ok(new
                 {
-                    success = true,
-                    message = "Payment already verified",
-                    amount = transaction.Amount,
-                    category = transaction.Category,
-                    newBalance = transaction.SenderWallet?.Balance ?? 0m
+                    message = "Payment already verified"
                 });
             }
+
+            await using var dbTransaction = await _context.Database.BeginTransactionAsync();
 
             var wallet = transaction.SenderWallet;
             if (wallet == null && transaction.SenderWalletId.HasValue)
@@ -471,7 +476,7 @@ namespace server.controller
             if (wallet == null)
                 return BadRequest(new { error = "Child wallet was not found" });
 
-            var category = NormalizeCategory(transaction.Category ?? session.Metadata.GetValueOrDefault("category") ?? string.Empty);
+            var category = NormalizeCategory(transaction.Category);
             if (string.IsNullOrEmpty(category))
                 return BadRequest(new { error = "Payment category was not found" });
 
@@ -511,7 +516,7 @@ namespace server.controller
                 await _context.SaveChangesAsync();
                 await dbTransaction.CommitAsync();
 
-                return BadRequest(new { error = transaction.FailureReason, balance = walletBalance });
+                return BadRequest(new { error = transaction.FailureReason });
             }
 
             wallet.Balance = walletBalance - transaction.Amount;
@@ -539,12 +544,7 @@ namespace server.controller
 
             return Ok(new
             {
-                success = true,
-                message = "Payment successful",
-                amount = transaction.Amount,
-                category,
-                newBalance = wallet.Balance,
-                currentMonthExpense = currentMonthExpense + transaction.Amount
+                message = "Payment successful"
             });
         }
 
